@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile=false
+      - run: pnpm validate:env --mode=ci
+        env:
+          NODE_ENV: test
+          APP_ENV: ci
+          PUBLIC_APP_NAME: AI Native Personal Stylist
+          PUBLIC_WEB_URL: http://localhost:3000
+          API_BASE_URL: http://localhost:4000
+          API_PORT: 4000
+          AI_PROVIDER: mock
+          VOICE_STT_PROVIDER: mock
+          VOICE_TTS_PROVIDER: mock
+          VISION_PROVIDER: mock
+          WEATHER_PROVIDER: mock
+          MAPS_PROVIDER: mock
+          RATE_LIMIT_MAX: 100
+          MAX_IMAGE_UPLOAD_MB: 8
+      - run: pnpm typecheck
+      - run: pnpm build
+      - run: pnpm audit --audit-level moderate
