@@ -191,3 +191,23 @@ export async function getUserProfile(requestedUserId: UserId): Promise<UserProfi
 export async function getDigitalCloset(requestedUserId: UserId): Promise<DigitalCloset | null> {
   return requestedUserId === mockCloset.userId ? mockCloset : null;
 }
+
+export async function getActiveClosetItems(requestedUserId: UserId): Promise<ClothingItem[]> {
+  const closet = await getDigitalCloset(requestedUserId);
+  return closet?.items.filter((item) => item.available) ?? [];
+}
+
+export async function setClothingItemAvailability(
+  requestedUserId: UserId,
+  itemId: ClothingItem['id'],
+  available: boolean
+): Promise<ClothingItem | null> {
+  const closet = await getDigitalCloset(requestedUserId);
+  const item = closet?.items.find((closetItem) => closetItem.id === itemId);
+
+  if (!item) return null;
+
+  item.available = available;
+  mockCloset.updatedAt = new Date().toISOString();
+  return item;
+}
