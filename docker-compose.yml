@@ -4,7 +4,26 @@ services:
     ports:
       - "4000:4000"
     env_file:
-      - .env.local
+      - path: .env.local
+        required: false
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      APP_ENV: ${APP_ENV:-local}
+      PUBLIC_APP_NAME: ${PUBLIC_APP_NAME:-AI Native Personal Stylist}
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
+      API_BASE_URL: ${API_BASE_URL:-http://localhost:4000}
+      API_PORT: ${API_PORT:-4000}
+      AI_PROVIDER: ${AI_PROVIDER:-mock}
+      VOICE_STT_PROVIDER: ${VOICE_STT_PROVIDER:-mock}
+      VOICE_TTS_PROVIDER: ${VOICE_TTS_PROVIDER:-mock}
+      VISION_PROVIDER: ${VISION_PROVIDER:-mock}
+      WEATHER_PROVIDER: ${WEATHER_PROVIDER:-mock}
+      MAPS_PROVIDER: ${MAPS_PROVIDER:-mock}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-100}
+      MAX_IMAGE_UPLOAD_MB: ${MAX_IMAGE_UPLOAD_MB:-8}
     read_only: true
     tmpfs:
       - /tmp
@@ -13,11 +32,20 @@ services:
   web:
     image: node:20.18.1-bookworm-slim
     working_dir: /app
-    command: sh -c "corepack enable && corepack prepare pnpm@9.15.4 --activate && pnpm install && pnpm --filter @stylist/web dev"
+    command: sh -c "corepack enable && corepack prepare pnpm@9.15.4 --activate && pnpm install --frozen-lockfile && pnpm --filter @stylist/web dev"
     ports:
       - "3000:3000"
     env_file:
-      - .env.local
+      - path: .env.local
+        required: false
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      APP_ENV: ${APP_ENV:-local}
+      PUBLIC_APP_NAME: ${PUBLIC_APP_NAME:-AI Native Personal Stylist}
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
+      API_BASE_URL: ${API_BASE_URL:-http://localhost:4000}
     volumes:
       - .:/app
     depends_on:

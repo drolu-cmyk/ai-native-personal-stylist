@@ -20,7 +20,7 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-      - run: pnpm install --frozen-lockfile=false
+      - run: pnpm install --frozen-lockfile
       - run: pnpm validate:env --mode=ci
         env:
           NODE_ENV: test
@@ -39,4 +39,5 @@ jobs:
           MAX_IMAGE_UPLOAD_MB: 8
       - run: pnpm typecheck
       - run: pnpm build
+      - run: pnpm smoke:api
       - run: pnpm audit --audit-level moderate

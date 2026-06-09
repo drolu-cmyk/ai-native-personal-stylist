@@ -2,12 +2,12 @@
 
 The application must stay portable by depending on standard containers, HTTP APIs, and provider adapters.
 
-## Initial targets
+## Runtime targets
 
-- Google Cloud Run for the API container.
-- AWS App Runner or ECS Fargate as the matching AWS path.
-- Secret Manager equivalents for provider credentials.
-- Artifact registries for container images.
+- Any OCI-compatible API container runtime.
+- Managed secret storage for provider credentials.
+- A container image registry controlled by the project owner.
+- HTTP event sources for voice requests, scheduled agent loops, and future integration callbacks.
 
 ## Rule
 
