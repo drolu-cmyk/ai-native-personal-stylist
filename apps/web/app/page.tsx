@@ -7,7 +7,7 @@ export default function HomePage() {
         <p>
           This starter uses mock providers by default so contributors can build safely without private credentials.
         </p>
-        <button type="button">Start voice styling</button>
+        <a className="button" href="/closet">Open closet dashboard</a>
       </section>
     </main>
   );

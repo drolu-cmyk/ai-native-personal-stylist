@@ -10,10 +10,43 @@ import {
   type UserProfile,
   type VoiceUtteranceContext
 } from '@stylist/shared';
-import { getDigitalCloset, getUserProfile } from '../data/mockCloset.js';
+import { getActiveClosetItems, getDigitalCloset, getUserProfile } from '../data/mockCloset.js';
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+async function fetchMockWeatherContext(): Promise<NonNullable<AmbientConditionTriggers['weather']>> {
+  return {
+    condition: 'rain',
+    temperatureC: 16,
+    precipitationChance: 0.72
+  };
+}
+
+async function fetchMockCalendarContext(): Promise<NonNullable<AmbientConditionTriggers['calendarEvent']>> {
+  return {
+    title: 'Dinner reservation',
+    startsAt: new Date(Date.now() + 20 * 60 * 1000).toISOString(),
+    locationLabel: 'Downtown',
+    formalityHint: 'business'
+  };
+}
+
+function assertAutonomousPayload(recommendation: StyleRecommendationPayload): StyleRecommendationPayload {
+  if (recommendation.source !== 'autonomous-agent') {
+    throw new Error('Autonomous recommendation source must be autonomous-agent.');
+  }
+
+  if (recommendation.providerMode !== 'mock') {
+    throw new Error('Autonomous recommendation provider mode must remain mock in the foundation.');
+  }
+
+  if (recommendation.outfit.length === 0) {
+    throw new Error('Autonomous recommendation could not select any active closet items.');
+  }
+
+  return recommendation;
 }
 
 function scoreItem(item: ClothingItem, context: AmbientConditionTriggers, profile: UserProfile): number {
@@ -156,25 +189,27 @@ function buildRecommendation(
 
 export async function generateAutonomousRecommendation(userId: string): Promise<StyleRecommendationPayload> {
   const normalizedUserId = userId as UserId;
-  const [profile, closet] = await Promise.all([getUserProfile(normalizedUserId), getDigitalCloset(normalizedUserId)]);
+  const [profile, closet, activeItems, weather, calendarEvent] = await Promise.all([
+    getUserProfile(normalizedUserId),
+    getDigitalCloset(normalizedUserId),
+    getActiveClosetItems(normalizedUserId),
+    fetchMockWeatherContext(),
+    fetchMockCalendarContext()
+  ]);
 
   if (!profile || !closet) {
     throw new Error(`No profile or closet found for ${userId}`);
   }
 
+  const activeCloset: DigitalCloset = {
+    ...closet,
+    items: activeItems
+  };
+
   const externalContext: AmbientConditionTriggers = {
     timeOfDay: 'evening',
-    weather: {
-      condition: 'rain',
-      temperatureC: 16,
-      precipitationChance: 0.72
-    },
-    calendarEvent: {
-      title: 'Dinner reservation',
-      startsAt: new Date(Date.now() + 20 * 60 * 1000).toISOString(),
-      locationLabel: 'Downtown',
-      formalityHint: 'business'
-    },
+    weather,
+    calendarEvent,
     destination: {
       label: 'Downtown restaurant',
       etaMinutes: 20,
@@ -182,13 +217,13 @@ export async function generateAutonomousRecommendation(userId: string): Promise<
     }
   };
 
-  return buildRecommendation({
+  return assertAutonomousPayload(buildRecommendation({
     userId: normalizedUserId,
     profile,
-    closet,
+    closet: activeCloset,
     context: externalContext,
     source: 'autonomous-agent'
-  });
+  }));
 }
 
 export async function generateVoiceRecommendation(
