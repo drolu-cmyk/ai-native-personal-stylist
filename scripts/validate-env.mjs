@@ -9,9 +9,12 @@ const providers = ['openai', 'google', 'aws', 'mock'];
 const required = ['NODE_ENV', 'PUBLIC_APP_NAME', 'PUBLIC_WEB_URL', 'API_BASE_URL', 'API_PORT'];
 const providerVars = ['AI_PROVIDER', 'VOICE_STT_PROVIDER', 'VOICE_TTS_PROVIDER', 'VISION_PROVIDER', 'WEATHER_PROVIDER', 'MAPS_PROVIDER'];
 const errors = [];
+const strictModes = new Set(['ci', 'staging', 'production']);
+const allowExampleEnv = process.env.ALLOW_EXAMPLE_ENV === 'true' || !strictModes.has(mode);
 
 function loadLocalEnv() {
-  for (const fileName of ['.env.local', '.env', '.env.example']) {
+  const envFiles = allowExampleEnv ? ['.env.local', '.env', '.env.example'] : ['.env.local', '.env'];
+  for (const fileName of envFiles) {
     const envPath = resolve(process.cwd(), fileName);
     if (!existsSync(envPath)) continue;
 

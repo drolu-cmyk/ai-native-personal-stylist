@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
 
 const apiPort = Number(process.env.API_PORT || 4100);
 const baseUrl = `http://127.0.0.1:${apiPort}`;
@@ -27,6 +28,9 @@ const server = spawn(process.execPath, ['apps/api/dist/index.js'], {
   env,
   stdio: ['ignore', 'pipe', 'pipe']
 });
+
+const mockClosetSource = await readFile('apps/api/src/data/mockCloset.ts', 'utf8');
+const validClosetItemIds = new Set([...mockClosetSource.matchAll(/id: '(item_[^']+)'/g)].map((match) => match[1]));
 
 let output = '';
 server.stdout.on('data', (chunk) => {
@@ -71,9 +75,12 @@ function assertInventoryBound(payload, source) {
   if (payload.source !== source) fail(`Expected source ${source}, received ${payload.source}.`);
   if (!Array.isArray(payload.outfit) || payload.outfit.length === 0) fail(`${source} returned no outfit slots.`);
 
-  for (const slot of payload.outfit) {
+  for (const slot of [...payload.outfit, ...(payload.fallbackAlternatives || [])]) {
     if (typeof slot.itemId !== 'string' || !slot.itemId.startsWith('item_')) {
       fail(`${source} returned a non-inventory item reference: ${JSON.stringify(slot)}.`);
+    }
+    if (!validClosetItemIds.has(slot.itemId)) {
+      fail(`${source} returned an item ID that is not present in the mock closet: ${slot.itemId}.`);
     }
   }
 

@@ -17,7 +17,7 @@ function nowIso() {
 }
 
 function scoreItem(item: ClothingItem, context: AmbientConditionTriggers, profile: UserProfile): number {
-  let score = item.available ? 10 : -100;
+  let score = 10;
   const lowerTags = item.tags.map((tag) => tag.toLowerCase());
 
   if (context.weather?.condition === 'rain' && (lowerTags.includes('rainy-day') || item.fabric.waterResistance !== 'none')) {
@@ -28,9 +28,14 @@ function scoreItem(item: ClothingItem, context: AmbientConditionTriggers, profil
   if (context.weather && context.weather.temperatureC > 24 && item.fabric.breathability === 'high') score += 4;
   if (context.calendarEvent?.formalityHint && item.formality === context.calendarEvent.formalityHint) score += 7;
   if (profile.fit.footwearComfortPriority === 'high' && item.tags.includes('comfort')) score += 5;
-  if (profile.constraints.excludedTags.some((tag) => lowerTags.includes(tag.toLowerCase()))) score -= 20;
-
   return score;
+}
+
+function isAllowedCandidate(item: ClothingItem, profile: UserProfile): boolean {
+  if (!item.available) return false;
+
+  const lowerTags = item.tags.map((tag) => tag.toLowerCase());
+  return !profile.constraints.excludedTags.some((tag) => lowerTags.includes(tag.toLowerCase()));
 }
 
 function bestByCategory(
@@ -40,7 +45,7 @@ function bestByCategory(
   categories: ClothingItem['category'][]
 ): ClothingItem | undefined {
   return closet.items
-    .filter((item) => categories.includes(item.category))
+    .filter((item) => categories.includes(item.category) && isAllowedCandidate(item, profile))
     .sort((a, b) => scoreItem(b, context, profile) - scoreItem(a, context, profile))[0];
 }
 
@@ -100,7 +105,7 @@ function buildRecommendation(
   const selected = [top, bottom, outerwear, footwear, accessory].filter((item): item is ClothingItem => Boolean(item));
   const selectedIds = new Set(selected.map((item) => item.id));
   const alternatives = closet.items
-    .filter((item) => item.available && !selectedIds.has(item.id))
+    .filter((item) => isAllowedCandidate(item, profile) && !selectedIds.has(item.id))
     .sort((a, b) => scoreItem(b, context, profile) - scoreItem(a, context, profile))
     .slice(0, 2);
 
