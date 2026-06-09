@@ -1,7 +1,37 @@
+# Dependencies
 node_modules/
+
+# Local environment and secrets
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+*.p12
+*.p8
+service-account*.json
+credentials*.json
+
+# Build output
 .next/
+out/
 dist/
+build/
 coverage/
+.turbo/
+.vercel/
+
+# Logs and caches
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+*.tsbuildinfo
+.eslintcache
+.cache/
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,11 +1,35 @@
 #!/usr/bin/env node
 
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 const modeArg = process.argv.find((arg) => arg.startsWith('--mode='));
 const mode = modeArg?.split('=')[1] || process.env.APP_ENV || process.env.NODE_ENV || 'development';
 const providers = ['openai', 'google', 'aws', 'mock'];
 const required = ['NODE_ENV', 'PUBLIC_APP_NAME', 'PUBLIC_WEB_URL', 'API_BASE_URL', 'API_PORT'];
 const providerVars = ['AI_PROVIDER', 'VOICE_STT_PROVIDER', 'VOICE_TTS_PROVIDER', 'VISION_PROVIDER', 'WEATHER_PROVIDER', 'MAPS_PROVIDER'];
 const errors = [];
+
+function loadLocalEnv() {
+  for (const fileName of ['.env.local', '.env', '.env.example']) {
+    const envPath = resolve(process.cwd(), fileName);
+    if (!existsSync(envPath)) continue;
+
+    const lines = readFileSync(envPath, 'utf8').split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+
+      const separatorIndex = trimmed.indexOf('=');
+      if (separatorIndex === -1) continue;
+
+      const name = trimmed.slice(0, separatorIndex).trim();
+      const rawValue = trimmed.slice(separatorIndex + 1).trim();
+      const unquotedValue = rawValue.replace(/^["']|["']$/g, '');
+      if (name && process.env[name] === undefined) process.env[name] = unquotedValue;
+    }
+  }
+}
 
 function value(name) { return process.env[name]?.trim(); }
 function requireVar(name) { if (!value(name)) errors.push(`${name} is required.`); }
@@ -14,6 +38,8 @@ function validateInt(name, min, max) {
   const number = Number(value(name));
   if (!Number.isInteger(number) || number < min || number > max) errors.push(`${name} must be between ${min} and ${max}.`);
 }
+
+loadLocalEnv();
 
 for (const name of required) requireVar(name);
 for (const name of providerVars) {

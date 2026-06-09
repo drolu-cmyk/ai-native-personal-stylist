@@ -4,9 +4,8 @@ Automation should handle validation, tests, scans, builds, dependency updates, a
 
 Human approval remains required for:
 
-- Billing account creation.
-- Startup credit applications.
 - Production provider credentials.
+- Paid service activation or material quota increases.
 - Adding maintainers with write or admin access.
 - Collecting real user images, voice, height, location, or wardrobe data.
 - Publishing production demos that may incur cost.

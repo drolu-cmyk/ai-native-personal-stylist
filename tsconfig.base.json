@@ -10,7 +10,6 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
-    "baseUrl": ".",
-    "paths": { "@stylist/shared": ["packages/shared/src/index.ts"] }
+    "baseUrl": "."
   }
 }

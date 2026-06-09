@@ -6,11 +6,17 @@
   "packageManager": "pnpm@9.15.4",
   "engines": { "node": ">=20.11.0", "pnpm": ">=9.0.0" },
   "scripts": {
-    "dev": "pnpm --parallel --filter @stylist/web --filter @stylist/api dev",
-    "build": "pnpm -r build",
-    "typecheck": "pnpm -r typecheck",
+    "dev": "corepack pnpm --parallel --filter @stylist/web --filter @stylist/api dev",
+    "build": "corepack pnpm -r build",
+    "typecheck": "corepack pnpm --filter @stylist/shared build && corepack pnpm -r typecheck",
     "validate:env": "node scripts/validate-env.mjs",
-    "security:audit": "pnpm audit --audit-level moderate"
+    "smoke:api": "node scripts/smoke-api.mjs",
+    "security:audit": "corepack pnpm audit --audit-level moderate"
+  },
+  "pnpm": {
+    "overrides": {
+      "postcss": "^8.5.15"
+    }
   },
   "devDependencies": {
     "@types/node": "^20.17.19",
