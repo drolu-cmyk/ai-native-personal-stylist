@@ -8,7 +8,7 @@ Use the existing Dockerfile as the deployable API artifact. Keep provider mode s
 
 ## Required GitHub configuration
 
-Set these in GitHub repository variables/secrets or in the `production` Environment used by the manual preflight workflow before any live deployment workflow is enabled:
+For the automatic main-branch preflight, set these as GitHub repository variables or secrets before merge:
 
 - `AWS_ROLE_TO_ASSUME`: GitHub OIDC role with least privilege for ECR and the target runtime.
 - `AWS_REGION`: AWS region for ECR and runtime resources.
@@ -21,9 +21,9 @@ Set these in GitHub repository variables/secrets or in the `production` Environm
 
 Provider credentials must stay in AWS Secrets Manager, Parameter Store, or the runtime platform secret store. Do not commit credentials, service account JSON, user wardrobe images, voice samples, billing data, or live location trails.
 
-## Manual preflight
+## Automatic preflight
 
-The `AWS Release Preflight` workflow is intentionally manual and bound to the `production` GitHub Environment. It does not deploy. It verifies that release configuration is present, validates production env, runs typecheck/build/smoke/audit, and builds the Docker image.
+The `AWS Release Preflight` workflow runs automatically on pushes to `main` and can also be started manually. It does not deploy live traffic. It verifies release configuration, validates production env, assumes the configured AWS OIDC role, verifies the ECR target exists, runs typecheck/build/smoke/audit, and builds the Docker image.
 
 Run these checks locally before deployment:
 
@@ -45,7 +45,7 @@ Do not deploy live unless all of the following are true:
 - CI and CodeQL pass on the release commit.
 - The branch is mergeable.
 - Production secrets and variables are configured outside git.
-- The manual AWS preflight passes against the `production` Environment.
+- The automatic AWS preflight passes on `main`.
 - Provider modes are intentionally selected.
 - CORS uses production origins, not wildcards.
 - No private user data exists in the repository.
