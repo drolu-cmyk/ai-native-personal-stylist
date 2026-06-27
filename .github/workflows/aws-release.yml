@@ -1,6 +1,8 @@
 name: AWS Release Preflight
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       confirm:
@@ -10,13 +12,13 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   preflight:
     runs-on: ubuntu-latest
-    environment: production
-    timeout-minutes: 15
-    if: inputs.confirm == 'preflight'
+    timeout-minutes: 20
+    if: github.event_name == 'push' || inputs.confirm == 'preflight'
     env:
       NODE_ENV: production
       APP_ENV: production
@@ -49,6 +51,15 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm validate:env --mode=production
       - run: pnpm aws:preflight
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Verify AWS release target
+        run: |
+          aws sts get-caller-identity
+          aws ecr describe-repositories --repository-names "$ECR_REPOSITORY"
       - run: pnpm typecheck
       - run: pnpm build
       - run: pnpm smoke:api
