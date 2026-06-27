@@ -12,7 +12,8 @@
     "typecheck": "corepack pnpm --filter @stylist/shared build && corepack pnpm -r typecheck",
     "validate:env": "node scripts/validate-env.mjs",
     "smoke:api": "node scripts/smoke-api.mjs",
-    "security:audit": "corepack pnpm audit --audit-level moderate"
+    "security:audit": "corepack pnpm audit --audit-level moderate",
+    "aws:preflight": "node scripts/aws-release-preflight.mjs"
   },
   "pnpm": {
     "overrides": {
