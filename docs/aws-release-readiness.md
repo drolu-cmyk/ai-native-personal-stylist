@@ -6,9 +6,9 @@ This repo is ready for an AWS release only after the code checks pass and produc
 
 Use the existing Dockerfile as the deployable API artifact. Keep provider mode set to `mock` until live provider credentials, privacy review, and user data handling are approved.
 
-## Required repository configuration
+## Required GitHub configuration
 
-Set these in GitHub repository secrets or variables before any live deployment workflow is enabled:
+Set these in GitHub repository variables/secrets or in the `production` Environment used by the manual preflight workflow before any live deployment workflow is enabled:
 
 - `AWS_ROLE_TO_ASSUME`: GitHub OIDC role with least privilege for ECR and the target runtime.
 - `AWS_REGION`: AWS region for ECR and runtime resources.
@@ -21,13 +21,16 @@ Set these in GitHub repository secrets or variables before any live deployment w
 
 Provider credentials must stay in AWS Secrets Manager, Parameter Store, or the runtime platform secret store. Do not commit credentials, service account JSON, user wardrobe images, voice samples, billing data, or live location trails.
 
-## Preflight checklist
+## Manual preflight
 
-Run these checks before deployment:
+The `AWS Release Preflight` workflow is intentionally manual and bound to the `production` GitHub Environment. It does not deploy. It verifies that release configuration is present, validates production env, runs typecheck/build/smoke/audit, and builds the Docker image.
+
+Run these checks locally before deployment:
 
 ```bash
 pnpm install --frozen-lockfile
 pnpm validate:env --mode=production
+pnpm aws:preflight
 pnpm typecheck
 pnpm build
 pnpm smoke:api
@@ -42,6 +45,7 @@ Do not deploy live unless all of the following are true:
 - CI and CodeQL pass on the release commit.
 - The branch is mergeable.
 - Production secrets and variables are configured outside git.
+- The manual AWS preflight passes against the `production` Environment.
 - Provider modes are intentionally selected.
 - CORS uses production origins, not wildcards.
 - No private user data exists in the repository.
