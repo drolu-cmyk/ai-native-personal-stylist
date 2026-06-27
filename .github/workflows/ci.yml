@@ -25,9 +25,10 @@ jobs:
         env:
           NODE_ENV: test
           APP_ENV: ci
-          PUBLIC_APP_NAME: AI Native Personal Stylist
+          PUBLIC_APP_NAME: Personal Stylist
           PUBLIC_WEB_URL: http://localhost:3000
           API_BASE_URL: http://localhost:4000
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:4000
           API_PORT: 4000
           AI_PROVIDER: mock
           VOICE_STT_PROVIDER: mock
