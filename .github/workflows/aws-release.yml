@@ -14,20 +14,60 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   preflight:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: github.event_name != 'workflow_dispatch' || inputs.confirm == 'preflight'
+    if: github.event_name == 'pull_request'
     env:
-      NODE_ENV: ${{ github.event_name == 'pull_request' && 'test' || 'production' }}
-      APP_ENV: ${{ github.event_name == 'pull_request' && 'ci' || 'production' }}
+      NODE_ENV: test
+      APP_ENV: ci
       PUBLIC_APP_NAME: Personal Stylist
-      PUBLIC_WEB_URL: ${{ github.event_name == 'pull_request' && 'http://localhost:3000' || vars.PUBLIC_WEB_URL }}
-      API_BASE_URL: ${{ github.event_name == 'pull_request' && 'http://localhost:4000' || vars.API_BASE_URL }}
-      NEXT_PUBLIC_API_BASE_URL: ${{ github.event_name == 'pull_request' && 'http://localhost:4000' || vars.API_BASE_URL }}
+      PUBLIC_WEB_URL: http://localhost:3000
+      API_BASE_URL: http://localhost:4000
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:4000
+      API_PORT: 4000
+      AI_PROVIDER: mock
+      VOICE_STT_PROVIDER: mock
+      VOICE_TTS_PROVIDER: mock
+      VISION_PROVIDER: mock
+      WEATHER_PROVIDER: mock
+      MAPS_PROVIDER: mock
+      CORS_ORIGINS: http://localhost:3000
+      RATE_LIMIT_MAX: 100
+      MAX_IMAGE_UPLOAD_MB: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm validate:env --mode=ci
+      - run: pnpm typecheck
+      - run: pnpm build
+      - run: pnpm smoke:api
+      - run: pnpm audit --audit-level moderate
+      - run: docker build -t personal-stylist-api:preflight .
+
+  production-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name == 'push' || inputs.confirm == 'preflight'
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      NODE_ENV: production
+      APP_ENV: production
+      PUBLIC_APP_NAME: Personal Stylist
+      PUBLIC_WEB_URL: ${{ vars.PUBLIC_WEB_URL }}
+      API_BASE_URL: ${{ vars.API_BASE_URL }}
+      NEXT_PUBLIC_API_BASE_URL: ${{ vars.API_BASE_URL }}
       API_PORT: 4000
       AI_PROVIDER: ${{ vars.AI_PROVIDER || 'mock' }}
       VOICE_STT_PROVIDER: ${{ vars.VOICE_STT_PROVIDER || 'mock' }}
@@ -35,7 +75,7 @@ jobs:
       VISION_PROVIDER: ${{ vars.VISION_PROVIDER || 'mock' }}
       WEATHER_PROVIDER: ${{ vars.WEATHER_PROVIDER || 'mock' }}
       MAPS_PROVIDER: ${{ vars.MAPS_PROVIDER || 'mock' }}
-      CORS_ORIGINS: ${{ github.event_name == 'pull_request' && 'http://localhost:3000' || vars.CORS_ORIGINS }}
+      CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
       RATE_LIMIT_MAX: ${{ vars.RATE_LIMIT_MAX || '100' }}
       MAX_IMAGE_UPLOAD_MB: ${{ vars.MAX_IMAGE_UPLOAD_MB || '8' }}
       AWS_REGION: ${{ vars.AWS_REGION }}
@@ -50,20 +90,16 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm validate:env --mode=${APP_ENV}
-      - name: AWS release configuration preflight
-        if: github.event_name != 'pull_request'
-        run: pnpm aws:preflight
+      - run: pnpm validate:env --mode=production
+      - run: pnpm aws:preflight
         env:
           AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME }}
       - name: Configure AWS credentials
-        if: github.event_name != 'pull_request'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ vars.AWS_REGION }}
       - name: Verify AWS release target
-        if: github.event_name != 'pull_request'
         run: |
           aws sts get-caller-identity
           aws ecr describe-repositories --repository-names "$ECR_REPOSITORY"
