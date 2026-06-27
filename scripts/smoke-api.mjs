@@ -60,6 +60,12 @@ async function waitForHealth() {
   fail('API smoke test failed: /health did not become ready.');
 }
 
+async function getJson(path) {
+  const response = await fetch(`${baseUrl}${path}`);
+  if (!response.ok) fail(`API smoke test failed: ${path} returned ${response.status}.`);
+  return response.json();
+}
+
 async function postJson(path, body) {
   const response = await fetch(`${baseUrl}${path}`, {
     method: 'POST',
@@ -96,6 +102,11 @@ function assertInventoryBound(payload, source) {
 try {
   await waitForHealth();
 
+  const closetPayload = await getJson('/api/closet?userId=user_alpha');
+  if (!Array.isArray(closetPayload.closet?.items) || closetPayload.closet.items.length === 0) {
+    fail('Closet endpoint returned no items.');
+  }
+
   const voicePayload = await postJson('/api/voice-recommend', {
     userId: 'user_alpha',
     transcript: 'I need dinner clothes and it might rain.',
@@ -119,7 +130,15 @@ try {
   assertInventoryBound(voicePayload, 'voice-loop');
   assertInventoryBound(autonomousPayload, 'autonomous-agent');
 
-  console.log('API smoke test passed: voice and autonomous routes returned inventory-bound recommendations.');
+  const feedbackPayload = await postJson('/api/recommendation-feedback', {
+    recommendationId: voicePayload.recommendationId,
+    userId: 'user_alpha',
+    accepted: true,
+    reason: 'accepted'
+  });
+  if (feedbackPayload.ok !== true) fail('Feedback endpoint did not acknowledge the response.');
+
+  console.log('API smoke test passed: closet, voice, autonomous, and feedback routes work.');
 } finally {
   server.kill();
 }
