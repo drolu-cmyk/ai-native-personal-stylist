@@ -88,3 +88,13 @@ export async function closetHandler(request: Request): Promise<Response> {
   if (!profile || !closet) return errorResponse(404, 'not_found', `No closet found for ${userId}.`);
   return jsonResponse({ profile, closet }, { status: 200 });
 }
+
+export async function recommendationFeedbackHandler(request: Request): Promise<Response> {
+  if (request.method !== 'POST') return errorResponse(405, 'method_not_allowed', 'Use POST for /api/recommendation-feedback.');
+  const body = await readJson(request);
+  const item = body as { recommendationId?: unknown; userId?: unknown; accepted?: unknown; reason?: unknown } | null;
+  if (!item || typeof item.recommendationId !== 'string' || typeof item.userId !== 'string' || typeof item.accepted !== 'boolean' || typeof item.reason !== 'string') {
+    return errorResponse(400, 'bad_request', 'Feedback requires recommendationId, userId, accepted, and reason.');
+  }
+  return jsonResponse({ ok: true, receivedAt: new Date().toISOString() }, { status: 202 });
+}
