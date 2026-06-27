@@ -1,1 +1,9 @@
-MIT
+MIT License
+
+Copyright 2026 Oluwabiyi Adeyemo
+
+This project may be used, copied, changed, shared, and sold under the MIT License.
+
+Keep this notice with copies of the project.
+
+This project is provided without warranty.
