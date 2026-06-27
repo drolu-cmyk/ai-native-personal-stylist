@@ -52,7 +52,7 @@ jobs:
       - run: pnpm build
       - run: pnpm smoke:api
       - run: pnpm audit --audit-level moderate
-      - run: docker build -t personal-stylist-api:preflight .
+      - run: docker build -f Dockerfile.release -t personal-stylist-api:preflight .
 
   production-preflight:
     runs-on: ubuntu-latest
@@ -107,4 +107,4 @@ jobs:
       - run: pnpm build
       - run: pnpm smoke:api
       - run: pnpm audit --audit-level moderate
-      - run: docker build -t personal-stylist-api:preflight .
+      - run: docker build -f Dockerfile.release -t personal-stylist-api:preflight .
