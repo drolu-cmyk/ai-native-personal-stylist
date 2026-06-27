@@ -3,32 +3,32 @@ export default function HomePage() {
     <main className="site-shell">
       <section className="hero-grid">
         <div>
-          <p className="eyebrow">Voice-first AI styling</p>
-          <h1>Ask what to wear. Get an outfit from your real closet.</h1>
+          <p className="eyebrow">Personal stylist</p>
+          <h1>Ask what to wear. Use what you own.</h1>
           <p className="lede">
-            A personal styling agent that combines your clothes, the weather, your calendar, fit preferences, and the occasion before recommending an outfit.
+            Tell the app where you are going. It checks your closet, the weather, and the occasion, then gives you a simple outfit.
           </p>
           <div className="actions">
-            <a className="button" href="/voice">Try the voice loop</a>
-            <a className="button secondary" href="/how-it-works">See how it works</a>
+            <a className="button" href="/voice">Find an outfit</a>
+            <a className="button secondary" href="/closet">View closet</a>
           </div>
-          <p className="trust-line">No imaginary clothes. Every outfit slot must reference an item the user actually owns.</p>
+          <p className="trust-line">The outfit comes from saved closet items only.</p>
         </div>
-        <aside className="agent-card" aria-label="Sample outfit reasoning">
-          <p className="card-label">Agent decision</p>
-          <h2>Dinner in 20 minutes. Rain likely.</h2>
+        <aside className="agent-card" aria-label="Sample outfit">
+          <p className="card-label">Example</p>
+          <h2>Dinner soon. Rain likely.</h2>
           <ol>
-            <li>Reads the voice request.</li>
-            <li>Checks weather, calendar, and closet.</li>
-            <li>Filters unavailable and excluded items.</li>
-            <li>Returns a speech-ready outfit plan.</li>
+            <li>Checks the plan.</li>
+            <li>Checks the weather.</li>
+            <li>Checks saved clothes.</li>
+            <li>Shows the outfit and a backup.</li>
           </ol>
         </aside>
       </section>
       <section className="section-grid">
-        <article><h2>Closet-bound</h2><p>Recommendations point to existing item IDs instead of generic fashion text.</p></article>
-        <article><h2>Context-aware</h2><p>Weather, time, formality, comfort, and occasion shape the result.</p></article>
-        <article><h2>Feedback-ready</h2><p>Acceptance, rejection, and swaps become signals for future decisions.</p></article>
+        <article><h2>Your closet</h2><p>The app works from clothes you have already saved.</p></article>
+        <article><h2>The day ahead</h2><p>Weather, time, and the occasion help narrow the choice.</p></article>
+        <article><h2>Your response</h2><p>Say yes, ask for another mix, or mark an item unavailable.</p></article>
       </section>
     </main>
   );
