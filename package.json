@@ -2,7 +2,8 @@
   "name": "ai-native-personal-stylist",
   "version": "0.1.0",
   "private": true,
-  "description": "Cloud-portable AI-native personal styling application.",
+  "license": "MIT",
+  "description": "Cloud-portable personal styling application.",
   "packageManager": "pnpm@9.15.4",
   "engines": { "node": ">=20.11.0", "pnpm": ">=9.0.0" },
   "scripts": {
