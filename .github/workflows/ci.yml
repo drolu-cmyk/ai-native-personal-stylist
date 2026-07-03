@@ -36,8 +36,14 @@ jobs:
           VISION_PROVIDER: mock
           WEATHER_PROVIDER: mock
           MAPS_PROVIDER: mock
+          AUTH_PROVIDER: mock
+          DATABASE_PROVIDER: mock
+          OBJECT_STORAGE_PROVIDER: mock
+          OBSERVABILITY_PROVIDER: mock
+          HOSTING_PROVIDER: mock
           RATE_LIMIT_MAX: 100
           MAX_IMAGE_UPLOAD_MB: 8
+      - run: pnpm test:production-readiness
       - run: pnpm typecheck
       - run: pnpm build
       - run: pnpm smoke:api

@@ -1,6 +1,6 @@
 # Shipping
 
-This app is prepared for public release. The first live version should be small, fast, and useful.
+This app is prepared for the next release gate. The first live version should be a restricted beta using real providers and controlled test data.
 
 ## Release path
 
@@ -9,6 +9,8 @@ This app is prepared for public release. The first live version should be small,
 3. Voice: use a provider adapter. Prefer Google voice for the public voice path.
 4. Location: use a provider adapter. Prefer Google Maps for places, routes, and destination context.
 5. Data: keep closet, images, feedback, and location access behind clear consent.
+
+Mock providers are not a production fallback. Use mock mode only for local development, tests, CI, and demo or sandbox mode.
 
 ## Voice
 
@@ -23,6 +25,10 @@ Location is used only when allowed by the user.
 Useful signals include destination weather, walking distance, transit time, indoor or outdoor venue, rain, snow, heat, wind, and humidity.
 
 Google Maps should be the preferred production path for places, routes, geocoding, and destination context. AWS Location can remain an adapter option.
+
+## Restricted live beta
+
+Before live traffic, configure real provider secrets outside git, run main-branch CI, CodeQL, AWS Release Preflight, API smoke test, dependency audit, and Docker release build. Do not allow real wardrobe images, voice input, billing, or location data until privacy, consent, storage, deletion, and logging controls are safe.
 
 ## Olu AI Skills
 

@@ -1,10 +1,10 @@
-const providerValues = ['openai', 'google', 'aws', 'mock'] as const;
-type Provider = (typeof providerValues)[number];
-
-function provider(name: string): Provider {
+function provider(name: string): string {
   const value = process.env[name] || 'mock';
-  if (!providerValues.includes(value as Provider)) throw new Error(`${name} must be a supported provider`);
-  return value as Provider;
+  if (!/^[a-z][a-z0-9_-]*$/i.test(value)) throw new Error(`${name} must be an explicit provider name`);
+  if ((process.env.APP_ENV || process.env.NODE_ENV) === 'production' && value.toLowerCase() === 'mock') {
+    throw new Error(`${name} must use a real provider in production`);
+  }
+  return value;
 }
 
 export function loadConfig() {
@@ -19,7 +19,12 @@ export function loadConfig() {
       voiceTts: provider('VOICE_TTS_PROVIDER'),
       vision: provider('VISION_PROVIDER'),
       weather: provider('WEATHER_PROVIDER'),
-      maps: provider('MAPS_PROVIDER')
+      maps: provider('MAPS_PROVIDER'),
+      auth: provider('AUTH_PROVIDER'),
+      database: provider('DATABASE_PROVIDER'),
+      objectStorage: provider('OBJECT_STORAGE_PROVIDER'),
+      observability: provider('OBSERVABILITY_PROVIDER'),
+      hosting: provider('HOSTING_PROVIDER')
     }
   };
 }

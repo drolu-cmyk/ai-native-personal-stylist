@@ -8,7 +8,8 @@ const required = [
   'API_BASE_URL',
   'CORS_ORIGINS',
   'RATE_LIMIT_MAX',
-  'MAX_IMAGE_UPLOAD_MB'
+  'MAX_IMAGE_UPLOAD_MB',
+  'STORAGE_DELETION_PRIVACY_READINESS_ACK'
 ];
 
 const providerVars = [
@@ -17,7 +18,12 @@ const providerVars = [
   'VOICE_TTS_PROVIDER',
   'VISION_PROVIDER',
   'WEATHER_PROVIDER',
-  'MAPS_PROVIDER'
+  'MAPS_PROVIDER',
+  'AUTH_PROVIDER',
+  'DATABASE_PROVIDER',
+  'OBJECT_STORAGE_PROVIDER',
+  'OBSERVABILITY_PROVIDER',
+  'HOSTING_PROVIDER'
 ];
 
 const errors = [];
@@ -36,7 +42,7 @@ function requireUrl(name) {
   if (!raw) return;
   try {
     const parsed = new URL(raw);
-    if (parsed.protocol !== 'https:') warnings.push(`${name} should use https for production.`);
+    if (parsed.protocol !== 'https:') errors.push(`${name} must use https for production.`);
   } catch {
     errors.push(`${name} must be a valid URL.`);
   }
@@ -51,8 +57,17 @@ if (value('CORS_ORIGINS')?.includes('*')) {
 }
 
 for (const name of providerVars) {
-  const current = value(name) || 'mock';
-  if (current !== 'mock') warnings.push(`${name} is set to ${current}; confirm credentials and privacy review before deployment.`);
+  const current = value(name);
+  if (!current) {
+    errors.push(`${name} is required for production release readiness.`);
+    continue;
+  }
+  if (!/^[a-z][a-z0-9_-]*$/i.test(current)) errors.push(`${name} must be an explicit provider name.`);
+  if (current.toLowerCase() === 'mock') errors.push(`${name} must use a real provider for production release readiness.`);
+}
+
+if (value('STORAGE_DELETION_PRIVACY_READINESS_ACK') !== 'true') {
+  errors.push('STORAGE_DELETION_PRIVACY_READINESS_ACK must be true after storage, deletion, privacy, consent, and logging readiness are reviewed.');
 }
 
 if (errors.length) {
