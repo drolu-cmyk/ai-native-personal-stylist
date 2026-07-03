@@ -43,7 +43,7 @@ jobs:
       RATE_LIMIT_MAX: 100
       MAX_IMAGE_UPLOAD_MB: 8
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.4
@@ -92,7 +92,7 @@ jobs:
       AWS_REGION: ${{ vars.AWS_REGION }}
       ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.4
