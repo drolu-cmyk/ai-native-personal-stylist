@@ -27,3 +27,4 @@ This repo is public. Do not commit real user data.
 - Secrets must live in GitHub or cloud secret stores.
 - Logs must avoid voice text, private image metadata, and precise location trails.
 - Users need a way to delete closet and profile data before public usage expands.
+- Production readiness requires `STORAGE_DELETION_PRIVACY_READINESS_ACK=true` only after storage, deletion, privacy, consent, and logging controls are reviewed.

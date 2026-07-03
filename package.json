@@ -11,6 +11,7 @@
     "build": "corepack pnpm -r build",
     "typecheck": "corepack pnpm --filter @stylist/shared build && corepack pnpm -r typecheck",
     "validate:env": "node scripts/validate-env.mjs",
+    "test:production-readiness": "node scripts/test-production-readiness.mjs",
     "smoke:api": "node scripts/smoke-api.mjs",
     "security:audit": "corepack pnpm audit --audit-level moderate",
     "aws:preflight": "node scripts/aws-release-preflight.mjs"

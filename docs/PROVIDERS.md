@@ -26,3 +26,23 @@ Use AWS for:
 ## Product rule
 
 The user experience should stay the same if the provider changes. Provider code should not leak into the web app copy or the outfit result.
+
+## Production rule
+
+Production must use real providers. Mock mode is allowed only for local development, tests, CI, and demo or sandbox mode.
+
+Required production provider categories:
+
+- AI provider: `AI_PROVIDER`
+- Speech-to-text provider: `VOICE_STT_PROVIDER`
+- Text-to-speech provider: `VOICE_TTS_PROVIDER`
+- Vision/image handling provider: `VISION_PROVIDER`
+- Weather provider: `WEATHER_PROVIDER`
+- Maps/location provider: `MAPS_PROVIDER`
+- Auth provider: `AUTH_PROVIDER`
+- Database/storage provider: `DATABASE_PROVIDER`
+- Image/object storage provider: `OBJECT_STORAGE_PROVIDER`
+- Logging/observability provider: `OBSERVABILITY_PROVIDER`
+- Hosting/runtime provider: `HOSTING_PROVIDER`
+
+Set explicit provider names through environment variables. Keep keys, tokens, JSON credentials, images, audio, billing data, and live location trails outside git.
