@@ -11,7 +11,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@fastify/cors": "^10.0.2",
+    "@fastify/cors": "^11.2.0",
     "@fastify/rate-limit": "^10.1.1",
     "@stylist/shared": "workspace:*",
     "fastify": "^5.2.1",
