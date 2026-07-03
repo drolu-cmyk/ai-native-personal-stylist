@@ -1,5 +1,6 @@
 import type { ApiErrorPayload, VoiceUtteranceContext } from '@stylist/shared';
 import { generateAutonomousRecommendation, generateVoiceRecommendation } from '../agents/recommendationEngine.js';
+import { getDigitalCloset, getUserProfile } from '../data/mockCloset.js';
 
 const jsonHeaders = { 'content-type': 'application/json; charset=utf-8' };
 
@@ -77,4 +78,23 @@ export async function autonomousRecommendationHandler(request: Request): Promise
   } catch (error) {
     return errorResponse(404, 'not_found', error instanceof Error ? error.message : 'Unable to generate recommendation.');
   }
+}
+
+export async function closetHandler(request: Request): Promise<Response> {
+  if (request.method !== 'GET') return errorResponse(405, 'method_not_allowed', 'Use GET for /api/closet.');
+  const userId = new URL(request.url).searchParams.get('userId');
+  if (!userId || !userId.startsWith('user_')) return errorResponse(400, 'bad_request', 'A valid userId is required.');
+  const [profile, closet] = await Promise.all([getUserProfile(userId as any), getDigitalCloset(userId as any)]);
+  if (!profile || !closet) return errorResponse(404, 'not_found', `No closet found for ${userId}.`);
+  return jsonResponse({ profile, closet }, { status: 200 });
+}
+
+export async function recommendationFeedbackHandler(request: Request): Promise<Response> {
+  if (request.method !== 'POST') return errorResponse(405, 'method_not_allowed', 'Use POST for /api/recommendation-feedback.');
+  const body = await readJson(request);
+  const item = body as { recommendationId?: unknown; userId?: unknown; accepted?: unknown; reason?: unknown } | null;
+  if (!item || typeof item.recommendationId !== 'string' || typeof item.userId !== 'string' || typeof item.accepted !== 'boolean' || typeof item.reason !== 'string') {
+    return errorResponse(400, 'bad_request', 'Feedback requires recommendationId, userId, accepted, and reason.');
+  }
+  return jsonResponse({ ok: true, receivedAt: new Date().toISOString() }, { status: 202 });
 }

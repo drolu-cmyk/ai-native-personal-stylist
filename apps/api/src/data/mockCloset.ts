@@ -25,10 +25,10 @@ export const mockUserProfile: UserProfile = {
     excludedTags: ['dry-clean-only']
   },
   location: {
-    city: 'New York',
-    region: 'NY',
-    country: 'US',
-    timezone: 'America/New_York'
+    city: 'Sample City',
+    region: 'Sample Region',
+    country: 'Sample Country',
+    timezone: 'UTC'
   },
   privacyConsent: {
     profileDataConsent: true,

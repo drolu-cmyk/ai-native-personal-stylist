@@ -1,0 +1,109 @@
+openapi: 3.1.0
+info:
+  title: Personal Stylist API
+  version: 0.1.0
+  description: API for closet lookup, outfit requests, and user response.
+servers:
+  - url: http://localhost:4000
+paths:
+  /health:
+    get:
+      summary: Service health check
+      responses:
+        '200':
+          description: Service is running
+  /api/closet:
+    get:
+      summary: Get saved closet
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Closet response
+        '400':
+          description: Invalid request
+        '404':
+          description: User or closet not found
+  /api/voice-recommend:
+    post:
+      summary: Request an outfit from a plain language plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, transcript, capturedAt, locale, urgency, latencyBudgetMs]
+              properties:
+                userId:
+                  type: string
+                transcript:
+                  type: string
+                capturedAt:
+                  type: string
+                  format: date-time
+                locale:
+                  type: string
+                urgency:
+                  type: string
+                latencyBudgetMs:
+                  type: integer
+                ambient:
+                  type: object
+      responses:
+        '200':
+          description: Outfit recommendation
+        '400':
+          description: Invalid request
+  /api/autonomous-recommend:
+    post:
+      summary: Request a prepared outfit for a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId:
+                  type: string
+      responses:
+        '200':
+          description: Outfit recommendation
+        '400':
+          description: Invalid request
+  /api/recommendation-feedback:
+    post:
+      summary: Save the user response to an outfit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recommendationId, userId, accepted, reason]
+              properties:
+                recommendationId:
+                  type: string
+                userId:
+                  type: string
+                accepted:
+                  type: boolean
+                reason:
+                  type: string
+      responses:
+        '202':
+          description: Response accepted
+        '400':
+          description: Invalid request
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

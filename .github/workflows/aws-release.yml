@@ -1,0 +1,110 @@
+name: AWS Release Preflight
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type preflight to run release readiness checks. This workflow does not deploy.
+        required: true
+        default: preflight
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name == 'pull_request'
+    env:
+      NODE_ENV: test
+      APP_ENV: ci
+      PUBLIC_APP_NAME: Personal Stylist
+      PUBLIC_WEB_URL: http://localhost:3000
+      API_BASE_URL: http://localhost:4000
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:4000
+      API_PORT: 4000
+      AI_PROVIDER: mock
+      VOICE_STT_PROVIDER: mock
+      VOICE_TTS_PROVIDER: mock
+      VISION_PROVIDER: mock
+      WEATHER_PROVIDER: mock
+      MAPS_PROVIDER: mock
+      CORS_ORIGINS: http://localhost:3000
+      RATE_LIMIT_MAX: 100
+      MAX_IMAGE_UPLOAD_MB: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm validate:env --mode=ci
+      - run: pnpm typecheck
+      - run: pnpm build
+      - run: pnpm smoke:api
+      - run: pnpm audit --audit-level moderate
+      - run: docker build -f Dockerfile.release -t personal-stylist-api:preflight .
+
+  production-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name == 'push' || inputs.confirm == 'preflight'
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      NODE_ENV: production
+      APP_ENV: production
+      PUBLIC_APP_NAME: Personal Stylist
+      PUBLIC_WEB_URL: ${{ vars.PUBLIC_WEB_URL }}
+      API_BASE_URL: ${{ vars.API_BASE_URL }}
+      NEXT_PUBLIC_API_BASE_URL: ${{ vars.API_BASE_URL }}
+      API_PORT: 4000
+      AI_PROVIDER: ${{ vars.AI_PROVIDER || 'mock' }}
+      VOICE_STT_PROVIDER: ${{ vars.VOICE_STT_PROVIDER || 'mock' }}
+      VOICE_TTS_PROVIDER: ${{ vars.VOICE_TTS_PROVIDER || 'mock' }}
+      VISION_PROVIDER: ${{ vars.VISION_PROVIDER || 'mock' }}
+      WEATHER_PROVIDER: ${{ vars.WEATHER_PROVIDER || 'mock' }}
+      MAPS_PROVIDER: ${{ vars.MAPS_PROVIDER || 'mock' }}
+      CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
+      RATE_LIMIT_MAX: ${{ vars.RATE_LIMIT_MAX || '100' }}
+      MAX_IMAGE_UPLOAD_MB: ${{ vars.MAX_IMAGE_UPLOAD_MB || '8' }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm validate:env --mode=production
+      - run: pnpm aws:preflight
+        env:
+          AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Verify AWS release target
+        run: |
+          aws sts get-caller-identity
+          aws ecr describe-repositories --repository-names "$ECR_REPOSITORY"
+      - run: pnpm typecheck
+      - run: pnpm build
+      - run: pnpm smoke:api
+      - run: pnpm audit --audit-level moderate
+      - run: docker build -f Dockerfile.release -t personal-stylist-api:preflight .
