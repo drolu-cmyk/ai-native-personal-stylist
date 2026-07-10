@@ -10,6 +10,7 @@
     "dev": "corepack pnpm --parallel --filter @stylist/web --filter @stylist/api dev",
     "build": "corepack pnpm -r build",
     "typecheck": "corepack pnpm --filter @stylist/shared build && corepack pnpm -r typecheck",
+    "test": "corepack pnpm --filter @stylist/api test",
     "validate:env": "node scripts/validate-env.mjs",
     "test:production-readiness": "node scripts/test-production-readiness.mjs",
     "smoke:api": "node scripts/smoke-api.mjs",
