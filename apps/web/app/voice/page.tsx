@@ -1,22 +1,48 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import {
+  getLocalClosetItems,
+  getPreferenceSignals,
+  mergeUnique,
+  removeValues,
+  savePreferenceSignals,
+  type LocalClosetItem,
+  type PreferenceSignals
+} from '../localStore';
 
 type OutfitSlot = { slot: string; itemId: string; reasonCode: string; confidence: number };
 type Recommendation = {
   recommendationId: string;
   outfit: OutfitSlot[];
   fallbackAlternatives: OutfitSlot[];
+  alternativeOutfits?: OutfitSlot[][];
   cautions: string[];
   ttsSummary: string;
   confidence: number;
+  learningSummary?: string[];
 };
 
-type ClosetItem = { id: string; name: string; primaryColor?: string };
+type SpeechRecognitionEventLike = {
+  results: ArrayLike<{ 0: { transcript: string } }>;
+};
+
+type SpeechRecognitionLike = {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  start: () => void;
+  stop: () => void;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+};
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-const userId = 'user_alpha';
+const userId = 'user_alpha' as const;
 
 const quickRequests = [
   'I have dinner in 20 minutes and it might rain.',
@@ -29,32 +55,47 @@ function humanize(value: string) {
   return value.replaceAll('-', ' ').replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
+function mergeClosets(baseItems: LocalClosetItem[], localItems: LocalClosetItem[]) {
+  const localById = new Map(localItems.map((item) => [item.id, item]));
+  const mergedBase = baseItems.map((item) => localById.get(item.id) || item);
+  const baseIds = new Set(baseItems.map((item) => item.id));
+  return [...mergedBase, ...localItems.filter((item) => !baseIds.has(item.id))];
+}
+
 export default function VoicePage() {
   const [requestText, setRequestText] = useState(quickRequests[0]);
-  const [closetItems, setClosetItems] = useState<ClosetItem[]>([]);
+  const [closetItems, setClosetItems] = useState<LocalClosetItem[]>([]);
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showAlternatives, setShowAlternatives] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
   const itemLookup = useMemo(
     () => new Map(closetItems.map((item) => [item.id, item])),
     [closetItems]
   );
 
-  async function loadCloset() {
+  async function loadCloset(): Promise<LocalClosetItem[]> {
     const response = await fetch(`${apiBaseUrl}/api/closet?userId=${userId}`);
     if (!response.ok) throw new Error('Your closet could not be loaded.');
     const payload = await response.json();
-    setClosetItems(payload.closet.items);
+    const merged = mergeClosets(payload.closet.items, getLocalClosetItems());
+    setClosetItems(merged);
+    return merged;
   }
 
   function contextFromRequest() {
     const request = requestText.toLowerCase();
-    const isRainy = request.includes('rain');
-    const isWork = request.includes('work') || request.includes('presentation') || request.includes('office');
+    const isRainy = request.includes('rain') || request.includes('storm');
+    const isSnowy = request.includes('snow');
+    const isCold = request.includes('cold') || request.includes('winter');
+    const isHot = request.includes('hot') || request.includes('summer');
+    const isWork = request.includes('work') || request.includes('presentation') || request.includes('office') || request.includes('meeting');
     const isChurch = request.includes('church') || request.includes('service');
     const isTravel = request.includes('airport') || request.includes('flight') || request.includes('travel');
+    const isFormal = request.includes('formal') || request.includes('wedding') || request.includes('gala');
 
     const eventTitle = isWork
       ? 'Work presentation'
@@ -62,19 +103,24 @@ export default function VoicePage() {
         ? 'Church service'
         : isTravel
           ? 'Airport departure'
-          : 'Dinner reservation';
+          : isFormal
+            ? 'Formal event'
+            : 'Dinner reservation';
+
+    const formalityHint = isFormal ? 'formal' : isTravel ? 'smart-casual' : 'business';
+    const condition = isSnowy ? 'snow' : isRainy ? 'rain' : isHot ? 'hot' : isCold ? 'cold' : 'clear';
 
     return {
       timeOfDay: isChurch ? 'morning' : 'evening',
       weather: {
-        condition: isRainy ? 'rain' : 'clear',
-        temperatureC: isRainy ? 16 : 22,
-        precipitationChance: isRainy ? 0.7 : 0.1
+        condition,
+        temperatureC: isSnowy || isCold ? 4 : isHot ? 29 : isRainy ? 16 : 22,
+        precipitationChance: isRainy || isSnowy ? 0.72 : 0.1
       },
       calendarEvent: {
         title: eventTitle,
         startsAt: new Date(Date.now() + 20 * 60 * 1000).toISOString(),
-        formalityHint: isTravel ? 'smart-casual' : 'business'
+        formalityHint
       },
       destination: {
         label: eventTitle,
@@ -82,6 +128,48 @@ export default function VoicePage() {
         expectedAesthetic: isTravel ? 'airport travel' : eventTitle.toLowerCase()
       }
     };
+  }
+
+  function startListening() {
+    if (typeof window === 'undefined') return;
+    const speechWindow = window as typeof window & {
+      SpeechRecognition?: SpeechRecognitionConstructor;
+      webkitSpeechRecognition?: SpeechRecognitionConstructor;
+    };
+    const Recognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
+
+    if (!Recognition) {
+      setMessage('Voice capture is not available in this browser. You can still type the request.');
+      return;
+    }
+
+    const recognition = new Recognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.continuous = false;
+    recognition.onresult = (event) => {
+      const transcript = event.results[0]?.[0]?.transcript;
+      if (transcript) setRequestText(transcript);
+    };
+    recognition.onerror = () => setMessage('Voice capture stopped before a clear request was received.');
+    recognition.onend = () => setIsListening(false);
+    recognitionRef.current = recognition;
+    setIsListening(true);
+    setMessage('Listening. Describe where you are going and what matters.');
+    recognition.start();
+  }
+
+  function stopListening() {
+    recognitionRef.current?.stop();
+    setIsListening(false);
+  }
+
+  function speakRecommendation() {
+    if (!recommendation || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(recommendation.ttsSummary);
+    utterance.rate = 1;
+    window.speechSynthesis.speak(utterance);
   }
 
   async function getRecommendation() {
@@ -95,7 +183,8 @@ export default function VoicePage() {
     setShowAlternatives(false);
 
     try {
-      await loadCloset();
+      const mergedCloset = await loadCloset();
+      const preferenceSignals = getPreferenceSignals();
       const response = await fetch(`${apiBaseUrl}/api/voice-recommend`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -106,11 +195,20 @@ export default function VoicePage() {
           locale: 'en-US',
           urgency: 'immediate',
           latencyBudgetMs: 4000,
-          ambient: contextFromRequest()
+          ambient: contextFromRequest(),
+          preferenceSignals,
+          closetSnapshot: {
+            userId,
+            items: mergedCloset,
+            updatedAt: new Date().toISOString()
+          }
         })
       });
 
-      if (!response.ok) throw new Error('The stylist could not build an outfit.');
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error?.message || 'The stylist could not build an outfit.');
+      }
       setRecommendation(await response.json());
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Something went wrong.');
@@ -119,8 +217,29 @@ export default function VoicePage() {
     }
   }
 
+  function updateLearning(accepted: boolean, itemIds: string[]): PreferenceSignals {
+    const current = getPreferenceSignals();
+    const selectedTags = itemIds.flatMap((itemId) => itemLookup.get(itemId)?.tags || []);
+    const next = accepted
+      ? {
+          ...current,
+          acceptedItemIds: mergeUnique(current.acceptedItemIds, itemIds),
+          rejectedItemIds: removeValues(current.rejectedItemIds, itemIds),
+          preferredTags: mergeUnique(current.preferredTags, selectedTags.slice(0, 8))
+        }
+      : {
+          ...current,
+          rejectedItemIds: mergeUnique(current.rejectedItemIds, itemIds),
+          acceptedItemIds: removeValues(current.acceptedItemIds, itemIds)
+        };
+    savePreferenceSignals(next);
+    return next;
+  }
+
   async function sendFeedback(accepted: boolean) {
     if (!recommendation) return;
+    const itemIds = recommendation.outfit.map((slot) => slot.itemId);
+    updateLearning(accepted, itemIds);
 
     const response = await fetch(`${apiBaseUrl}/api/recommendation-feedback`, {
       method: 'POST',
@@ -129,18 +248,35 @@ export default function VoicePage() {
         recommendationId: recommendation.recommendationId,
         userId,
         accepted,
-        reason: accepted ? 'accepted' : 'swap'
+        reason: accepted ? 'accepted' : 'swap',
+        itemIds
       })
     });
 
     if (!response.ok) {
-      setMessage('Your response could not be saved.');
+      setMessage('Your local preference was saved, but the API could not acknowledge it.');
       return;
     }
 
     setShowAlternatives(!accepted);
-    setMessage(accepted ? 'Outfit accepted. This preference can shape future recommendations.' : 'Here are the closest swap options from your closet.');
+    setMessage(accepted
+      ? 'Outfit accepted. Its pieces and useful attributes will influence the next recommendation.'
+      : 'This mix was deprioritized. Choose an alternative or ask for a new decision.');
   }
+
+  function useAlternative(slots: OutfitSlot[]) {
+    if (!recommendation) return;
+    const summary = `Wear ${slots.map((slot) => itemLookup.get(slot.itemId)?.name || slot.itemId).join(', ')}.`;
+    setRecommendation({ ...recommendation, outfit: slots, ttsSummary: summary });
+    setShowAlternatives(false);
+    setMessage('Alternative selected. Confirm it if this is the outfit you will wear.');
+  }
+
+  const alternatives = recommendation?.alternativeOutfits?.length
+    ? recommendation.alternativeOutfits
+    : recommendation?.fallbackAlternatives?.length
+      ? [recommendation.fallbackAlternatives]
+      : [];
 
   return (
     <main className="site-shell stylist-page">
@@ -163,15 +299,21 @@ export default function VoicePage() {
             rows={5}
             placeholder="Dinner in an hour, business casual, and I will be walking..."
           />
+          <div className="voice-controls">
+            <button className="voice-button" type="button" onClick={isListening ? stopListening : startListening}>
+              <span className={isListening ? 'voice-dot listening' : 'voice-dot'} aria-hidden="true" />
+              {isListening ? 'Stop listening' : 'Speak the plan'}
+            </button>
+            <span>Voice is transcribed by the browser and is not stored as an audio file.</span>
+          </div>
           <div className="quick-prompts" aria-label="Example requests">
             {quickRequests.map((request) => (
               <button type="button" onClick={() => setRequestText(request)} key={request}>{request}</button>
             ))}
           </div>
           <button className="button wide-button" type="button" onClick={getRecommendation} disabled={isLoading}>
-            {isLoading ? 'Checking your closet...' : 'Build my outfit'}
+            {isLoading ? 'Comparing complete outfits...' : 'Build my outfit'}
           </button>
-          <p className="privacy-note">The current prototype sends text and structured context. It does not store a voice recording.</p>
           {message ? <p className="status-text" role="status">{message}</p> : null}
         </div>
 
@@ -186,7 +328,10 @@ export default function VoicePage() {
 
           {recommendation ? (
             <>
-              <p className="recommendation-summary">{recommendation.ttsSummary}</p>
+              <div className="summary-row">
+                <p className="recommendation-summary">{recommendation.ttsSummary}</p>
+                <button className="listen-button" type="button" onClick={speakRecommendation}>Hear it</button>
+              </div>
               <div className="outfit-list">
                 {recommendation.outfit.map((slot) => {
                   const item = itemLookup.get(slot.itemId);
@@ -204,25 +349,38 @@ export default function VoicePage() {
                 })}
               </div>
 
-              {recommendation.cautions.length ? <p className="caution-note">{recommendation.cautions[0]}</p> : null}
+              {recommendation.cautions.map((caution) => <p className="caution-note" key={caution}>{caution}</p>)}
+              {recommendation.learningSummary?.length ? (
+                <div className="learning-note">
+                  <strong>What influenced this</strong>
+                  {recommendation.learningSummary.map((signal) => <span key={signal}>{signal}</span>)}
+                </div>
+              ) : null}
 
               <div className="actions">
                 <button className="button" type="button" onClick={() => sendFeedback(true)}>I’ll wear this</button>
-                <button className="button secondary" type="button" onClick={() => sendFeedback(false)}>Show swap options</button>
+                <button className="button secondary" type="button" onClick={() => sendFeedback(false)}>Not this mix</button>
               </div>
 
-              {showAlternatives && recommendation.fallbackAlternatives.length ? (
+              {showAlternatives && alternatives.length ? (
                 <div className="alternatives-panel">
-                  <p className="card-label">Closest alternatives</p>
-                  {recommendation.fallbackAlternatives.map((slot) => {
-                    const item = itemLookup.get(slot.itemId);
-                    return (
-                      <div className="alternative-row" key={`${slot.slot}-${slot.itemId}`}>
-                        <span className="item-swatch small-swatch" style={{ background: item?.primaryColor || '#d9d5ce' }} aria-hidden="true" />
-                        <span><strong>{item?.name || slot.itemId}</strong><small>{humanize(slot.slot)}</small></span>
+                  <p className="card-label">Complete alternatives</p>
+                  {alternatives.map((alternative, index) => (
+                    <article className="alternative-outfit" key={`alternative-${index}`}>
+                      <div>
+                        {alternative.map((slot) => {
+                          const item = itemLookup.get(slot.itemId);
+                          return (
+                            <div className="alternative-row" key={`${index}-${slot.slot}-${slot.itemId}`}>
+                              <span className="item-swatch small-swatch" style={{ background: item?.primaryColor || '#d9d5ce' }} aria-hidden="true" />
+                              <span><strong>{item?.name || slot.itemId}</strong><small>{humanize(slot.slot)}</small></span>
+                            </div>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
+                      <button type="button" onClick={() => useAlternative(alternative)}>Use this mix</button>
+                    </article>
+                  ))}
                 </div>
               ) : null}
             </>
@@ -233,7 +391,7 @@ export default function VoicePage() {
                 <span />
                 <span />
               </div>
-              <p>One outfit. A short reason. A useful alternative only when you need it.</p>
+              <p>One complete outfit, ranked for context, fit, color, comfort, availability, and what the stylist has learned.</p>
             </div>
           )}
         </div>
