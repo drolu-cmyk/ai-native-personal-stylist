@@ -23,6 +23,25 @@ async function readJson(request: Request): Promise<unknown> {
   }
 }
 
+function isValidClosetSnapshot(candidate: Partial<VoiceUtteranceContext>) {
+  if (!candidate.closetSnapshot) return true;
+  return (
+    candidate.closetSnapshot.userId === candidate.userId &&
+    Array.isArray(candidate.closetSnapshot.items) &&
+    candidate.closetSnapshot.items.every(
+      (item) =>
+        item &&
+        typeof item.id === 'string' &&
+        item.id.startsWith('item_') &&
+        item.userId === candidate.userId &&
+        typeof item.name === 'string' &&
+        typeof item.category === 'string' &&
+        typeof item.primaryColor === 'string' &&
+        typeof item.available === 'boolean'
+    )
+  );
+}
+
 function isVoiceContext(value: unknown): value is VoiceUtteranceContext {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<VoiceUtteranceContext>;
@@ -38,7 +57,8 @@ function isVoiceContext(value: unknown): value is VoiceUtteranceContext {
     candidate.latencyBudgetMs > 0 &&
     typeof candidate.urgency === 'string' &&
     Boolean(candidate.ambient) &&
-    typeof candidate.ambient?.timeOfDay === 'string'
+    typeof candidate.ambient?.timeOfDay === 'string' &&
+    isValidClosetSnapshot(candidate)
   );
 }
 
@@ -49,12 +69,12 @@ export async function voiceRecommendHandler(request: Request): Promise<Response>
 
   const body = await readJson(request);
   if (!isVoiceContext(body)) {
-    return errorResponse(400, 'bad_request', 'VoiceUtteranceContext is required.');
+    return errorResponse(400, 'bad_request', 'A valid VoiceUtteranceContext and closet snapshot are required.');
   }
 
   try {
     const recommendation = await generateVoiceRecommendation(body);
-    return jsonResponse(recommendation, { status: 200 });
+    return jsonResponse({ ...recommendation, providerMode: 'internal-ranker' }, { status: 200 });
   } catch (error) {
     return errorResponse(404, 'not_found', error instanceof Error ? error.message : 'Unable to generate recommendation.');
   }
@@ -74,7 +94,7 @@ export async function autonomousRecommendationHandler(request: Request): Promise
 
   try {
     const recommendation = await generateAutonomousRecommendation(userId);
-    return jsonResponse(recommendation, { status: 200 });
+    return jsonResponse({ ...recommendation, providerMode: 'internal-ranker' }, { status: 200 });
   } catch (error) {
     return errorResponse(404, 'not_found', error instanceof Error ? error.message : 'Unable to generate recommendation.');
   }
@@ -92,9 +112,28 @@ export async function closetHandler(request: Request): Promise<Response> {
 export async function recommendationFeedbackHandler(request: Request): Promise<Response> {
   if (request.method !== 'POST') return errorResponse(405, 'method_not_allowed', 'Use POST for /api/recommendation-feedback.');
   const body = await readJson(request);
-  const item = body as { recommendationId?: unknown; userId?: unknown; accepted?: unknown; reason?: unknown } | null;
-  if (!item || typeof item.recommendationId !== 'string' || typeof item.userId !== 'string' || typeof item.accepted !== 'boolean' || typeof item.reason !== 'string') {
-    return errorResponse(400, 'bad_request', 'Feedback requires recommendationId, userId, accepted, and reason.');
+  const item = body as { recommendationId?: unknown; userId?: unknown; accepted?: unknown; reason?: unknown; itemIds?: unknown } | null;
+  if (
+    !item ||
+    typeof item.recommendationId !== 'string' ||
+    typeof item.userId !== 'string' ||
+    typeof item.accepted !== 'boolean' ||
+    typeof item.reason !== 'string' ||
+    (item.itemIds !== undefined && (!Array.isArray(item.itemIds) || !item.itemIds.every((id) => typeof id === 'string' && id.startsWith('item_'))))
+  ) {
+    return errorResponse(400, 'bad_request', 'Feedback requires recommendationId, userId, accepted, reason, and optional closet item IDs.');
   }
-  return jsonResponse({ ok: true, receivedAt: new Date().toISOString() }, { status: 202 });
+  return jsonResponse(
+    {
+      ok: true,
+      receivedAt: new Date().toISOString(),
+      providerMode: 'internal-ranker',
+      learningSignal: {
+        accepted: item.accepted,
+        itemIds: item.itemIds || [],
+        reason: item.reason
+      }
+    },
+    { status: 202 }
+  );
 }

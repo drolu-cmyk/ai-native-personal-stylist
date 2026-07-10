@@ -1,0 +1,235 @@
+input, select {
+  font: inherit;
+  color: var(--ink);
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgba(165, 91, 63, .35);
+  outline-offset: 3px;
+}
+
+.voice-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0 4px;
+  color: var(--muted);
+  font-size: .72rem;
+}
+
+.voice-button,
+.listen-button,
+.alternative-outfit button,
+.closet-actions button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: white;
+  padding: 9px 12px;
+  cursor: pointer;
+  font-size: .72rem;
+  font-weight: 800;
+}
+
+.voice-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.voice-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.voice-dot.listening {
+  background: #bd3e32;
+  box-shadow: 0 0 0 6px rgba(189, 62, 50, .12);
+  animation: listening-pulse 1.25s ease-in-out infinite;
+}
+
+@keyframes listening-pulse {
+  0%, 100% { transform: scale(.9); }
+  50% { transform: scale(1.1); }
+}
+
+.summary-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.listen-button {
+  margin-top: 20px;
+  flex: 0 0 auto;
+}
+
+.learning-note {
+  margin-top: 16px;
+  padding: 14px;
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(23, 25, 22, .12);
+  border-radius: 14px;
+  font-size: .74rem;
+  color: var(--muted);
+}
+
+.learning-note strong {
+  color: var(--ink);
+}
+
+.alternative-outfit {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(23, 25, 22, .12);
+}
+
+.alternative-outfit:last-child {
+  border-bottom: 0;
+}
+
+.garment-intake {
+  margin: 0 0 50px;
+  padding: clamp(24px, 4vw, 42px);
+  display: grid;
+  grid-template-columns: .8fr 1.2fr;
+  gap: clamp(28px, 6vw, 70px);
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+}
+
+.garment-intake h2 {
+  font-size: clamp(2rem, 4vw, 3.4rem);
+}
+
+.garment-intake > div > p:last-child {
+  color: var(--muted);
+}
+
+.garment-form {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.garment-form label {
+  display: grid;
+  gap: 8px;
+  font-size: .72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.garment-form input,
+.garment-form select {
+  min-height: 46px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: white;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.garment-form input[type="color"] {
+  padding: 4px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+
+.intake-preview {
+  width: min(220px, 100%);
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+}
+
+.consent-check {
+  grid-template-columns: auto 1fr !important;
+  align-items: start;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  font-weight: 500 !important;
+  line-height: 1.5;
+}
+
+.consent-check input {
+  min-height: auto;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+}
+
+.closet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.closet-actions button {
+  padding: 7px 10px;
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .garment-intake {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .voice-controls,
+  .summary-row,
+  .alternative-outfit {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .voice-controls,
+  .summary-row {
+    display: flex;
+  }
+
+  .alternative-outfit {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .listen-button {
+    margin-top: 0;
+    width: fit-content;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}

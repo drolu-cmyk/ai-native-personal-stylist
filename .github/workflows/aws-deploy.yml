@@ -1,0 +1,189 @@
+name: AWS Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type deploy to release the current main branch.
+        required: true
+        default: deploy
+
+concurrency:
+  group: ai-native-stylist-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+  APP_RUNNER_SERVICE_ARN: ${{ vars.APP_RUNNER_SERVICE_ARN }}
+  WEB_BUCKET: ${{ vars.WEB_BUCKET }}
+  CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}
+  PUBLIC_WEB_URL: ${{ vars.PUBLIC_WEB_URL }}
+  API_BASE_URL: ${{ vars.API_BASE_URL }}
+
+jobs:
+  deploy:
+    if: github.event_name == 'push' || inputs.confirm == 'deploy'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Verify release configuration
+        env:
+          AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+        run: |
+          set -euo pipefail
+          required=(
+            AWS_ROLE_TO_ASSUME AWS_REGION ECR_REPOSITORY APP_RUNNER_SERVICE_ARN
+            WEB_BUCKET PUBLIC_WEB_URL API_BASE_URL
+          )
+          for name in "${required[@]}"; do
+            if [ -z "${!name:-}" ]; then
+              echo "Missing required deployment setting: $name" >&2
+              exit 1
+            fi
+          done
+          case "$PUBLIC_WEB_URL" in https://*) ;; *) echo "PUBLIC_WEB_URL must use HTTPS" >&2; exit 1 ;; esac
+          case "$API_BASE_URL" in https://*) ;; *) echo "API_BASE_URL must use HTTPS" >&2; exit 1 ;; esac
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm smoke:api
+      - run: pnpm audit --audit-level moderate
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Verify AWS targets
+        run: |
+          set -euo pipefail
+          aws sts get-caller-identity
+          aws ecr describe-repositories --repository-names "$ECR_REPOSITORY"
+          aws apprunner describe-service --service-arn "$APP_RUNNER_SERVICE_ARN"
+          aws s3api head-bucket --bucket "$WEB_BUCKET"
+          if [ -n "${CLOUDFRONT_DISTRIBUTION_ID:-}" ]; then
+            aws cloudfront get-distribution --id "$CLOUDFRONT_DISTRIBUTION_ID" >/dev/null
+          fi
+
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Preserve rollback image
+        id: rollback
+        run: |
+          set -euo pipefail
+          rollback_tag="rollback-${GITHUB_RUN_ID}"
+          manifest=$(aws ecr batch-get-image \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids imageTag=latest \
+            --query 'images[0].imageManifest' \
+            --output text 2>/dev/null || true)
+          if [ -n "$manifest" ] && [ "$manifest" != "None" ]; then
+            aws ecr put-image \
+              --repository-name "$ECR_REPOSITORY" \
+              --image-tag "$rollback_tag" \
+              --image-manifest "$manifest" >/dev/null
+            echo "tag=$rollback_tag" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=none" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and push API image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          set -euo pipefail
+          image="$REGISTRY/$ECR_REPOSITORY"
+          docker build -f Dockerfile.release \
+            -t "$image:${GITHUB_SHA}" \
+            -t "$image:latest" .
+          docker push "$image:${GITHUB_SHA}"
+          docker push "$image:latest"
+          echo "API image: $image:${GITHUB_SHA}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Deploy API through App Runner
+        run: |
+          set -euo pipefail
+          aws apprunner start-deployment --service-arn "$APP_RUNNER_SERVICE_ARN" >/dev/null
+          for attempt in $(seq 1 60); do
+            status=$(aws apprunner describe-service \
+              --service-arn "$APP_RUNNER_SERVICE_ARN" \
+              --query 'Service.Status' --output text)
+            echo "App Runner status: $status"
+            if [ "$status" = "RUNNING" ]; then
+              exit 0
+            fi
+            case "$status" in
+              CREATE_FAILED|DELETE_FAILED) exit 1 ;;
+            esac
+            sleep 10
+          done
+          echo "App Runner deployment did not return to RUNNING." >&2
+          exit 1
+
+      - name: Build production web export
+        env:
+          NEXT_PUBLIC_API_BASE_URL: ${{ vars.API_BASE_URL }}
+        run: pnpm --filter @stylist/web build
+
+      - name: Publish web application to S3
+        run: |
+          set -euo pipefail
+          test -d apps/web/out
+          aws s3 sync apps/web/out "s3://$WEB_BUCKET" \
+            --delete \
+            --cache-control "public,max-age=300"
+          aws s3 cp apps/web/out "s3://$WEB_BUCKET" \
+            --recursive \
+            --exclude "*" \
+            --include "*.html" \
+            --cache-control "no-cache,no-store,must-revalidate" \
+            --content-type "text/html"
+
+      - name: Invalidate CloudFront cache
+        if: env.CLOUDFRONT_DISTRIBUTION_ID != ''
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
+            --paths '/*' >/dev/null
+
+      - name: Verify live release
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error "$API_BASE_URL/health" >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              echo "API health check failed." >&2
+              exit 1
+            fi
+            sleep 10
+          done
+          curl --fail --silent --show-error "$PUBLIC_WEB_URL" >/dev/null
+          echo "Web: $PUBLIC_WEB_URL" >> "$GITHUB_STEP_SUMMARY"
+          echo "API: $API_BASE_URL" >> "$GITHUB_STEP_SUMMARY"
+          echo "Rollback image: ${{ steps.rollback.outputs.tag }}" >> "$GITHUB_STEP_SUMMARY"
