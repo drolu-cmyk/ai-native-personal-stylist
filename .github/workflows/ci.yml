@@ -44,7 +44,16 @@ jobs:
           RATE_LIMIT_MAX: 100
           MAX_IMAGE_UPLOAD_MB: 8
       - run: pnpm test:production-readiness
-      - run: pnpm typecheck
+      - name: Typecheck
+        id: typecheck
+        run: pnpm typecheck > typecheck.log 2>&1
+      - name: Upload typecheck diagnostics
+        if: failure() && steps.typecheck.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: typecheck-diagnostics
+          path: typecheck.log
+          retention-days: 2
       - run: pnpm test
       - run: pnpm build
       - run: pnpm smoke:api
