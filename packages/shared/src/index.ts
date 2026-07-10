@@ -26,7 +26,7 @@ export type StylingOccasion =
   | 'travel'
   | 'date-night'
   | 'custom';
-export type ProviderMode = 'mock' | 'openai' | 'google' | 'aws';
+export type ProviderMode = 'mock' | 'internal-ranker' | 'openai' | 'google' | 'aws';
 
 export interface LocationMetadata {
   city?: string;
@@ -223,11 +223,11 @@ export function ensureClosetItemIds(
 ): StyleRecommendationPayload {
   const validIds = new Set(closet.items.map((item) => item.id));
   const alternativeIds = (recommendation.alternativeOutfits || []).flat().map((slot) => slot.itemId);
-  const allRecommendedIds = [
-    ...recommendation.outfit,
-    ...recommendation.fallbackAlternatives,
+  const allRecommendedIds: ClothingItemId[] = [
+    ...recommendation.outfit.map((slot) => slot.itemId),
+    ...recommendation.fallbackAlternatives.map((slot) => slot.itemId),
     ...alternativeIds
-  ].map((slotOrId) => typeof slotOrId === 'string' ? slotOrId : slotOrId.itemId);
+  ];
   const unknownIds = allRecommendedIds.filter((itemId) => !validIds.has(itemId));
 
   if (unknownIds.length > 0) {
