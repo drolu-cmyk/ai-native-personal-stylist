@@ -74,7 +74,7 @@ export async function voiceRecommendHandler(request: Request): Promise<Response>
 
   try {
     const recommendation = await generateVoiceRecommendation(body);
-    return jsonResponse(recommendation, { status: 200 });
+    return jsonResponse({ ...recommendation, providerMode: 'internal-ranker' }, { status: 200 });
   } catch (error) {
     return errorResponse(404, 'not_found', error instanceof Error ? error.message : 'Unable to generate recommendation.');
   }
@@ -94,7 +94,7 @@ export async function autonomousRecommendationHandler(request: Request): Promise
 
   try {
     const recommendation = await generateAutonomousRecommendation(userId);
-    return jsonResponse(recommendation, { status: 200 });
+    return jsonResponse({ ...recommendation, providerMode: 'internal-ranker' }, { status: 200 });
   } catch (error) {
     return errorResponse(404, 'not_found', error instanceof Error ? error.message : 'Unable to generate recommendation.');
   }
@@ -127,6 +127,7 @@ export async function recommendationFeedbackHandler(request: Request): Promise<R
     {
       ok: true,
       receivedAt: new Date().toISOString(),
+      providerMode: 'internal-ranker',
       learningSignal: {
         accepted: item.accepted,
         itemIds: item.itemIds || [],
