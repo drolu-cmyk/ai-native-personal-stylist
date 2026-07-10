@@ -1,4 +1,5 @@
 import './styles.css';
+import './features.css';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
