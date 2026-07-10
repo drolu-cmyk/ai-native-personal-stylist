@@ -12,7 +12,13 @@ import {
   type PreferenceSignals
 } from '../localStore';
 
-type OutfitSlot = { slot: string; itemId: string; reasonCode: string; confidence: number };
+type OutfitSlot = {
+  slot: string;
+  itemId: LocalClosetItem['id'];
+  reasonCode: string;
+  confidence: number;
+};
+
 type Recommendation = {
   recommendationId: string;
   outfit: OutfitSlot[];
@@ -217,7 +223,7 @@ export default function VoicePage() {
     }
   }
 
-  function updateLearning(accepted: boolean, itemIds: string[]): PreferenceSignals {
+  function updateLearning(accepted: boolean, itemIds: LocalClosetItem['id'][]): PreferenceSignals {
     const current = getPreferenceSignals();
     const selectedTags = itemIds.flatMap((itemId) => itemLookup.get(itemId)?.tags || []);
     const next = accepted
