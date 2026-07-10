@@ -14,12 +14,17 @@ const env = {
   PUBLIC_WEB_URL: process.env.PUBLIC_WEB_URL || 'http://localhost:3000',
   API_BASE_URL: process.env.API_BASE_URL || baseUrl,
   CORS_ORIGINS: process.env.CORS_ORIGINS || 'http://localhost:3000',
-  AI_PROVIDER: process.env.AI_PROVIDER || 'mock',
-  VOICE_STT_PROVIDER: process.env.VOICE_STT_PROVIDER || 'mock',
-  VOICE_TTS_PROVIDER: process.env.VOICE_TTS_PROVIDER || 'mock',
-  VISION_PROVIDER: process.env.VISION_PROVIDER || 'mock',
-  WEATHER_PROVIDER: process.env.WEATHER_PROVIDER || 'mock',
-  MAPS_PROVIDER: process.env.MAPS_PROVIDER || 'mock',
+  AI_PROVIDER: process.env.AI_PROVIDER || 'internal-ranker',
+  VOICE_STT_PROVIDER: process.env.VOICE_STT_PROVIDER || 'browser-web-speech',
+  VOICE_TTS_PROVIDER: process.env.VOICE_TTS_PROVIDER || 'browser-web-speech',
+  VISION_PROVIDER: process.env.VISION_PROVIDER || 'local-confirmed',
+  WEATHER_PROVIDER: process.env.WEATHER_PROVIDER || 'structured-context',
+  MAPS_PROVIDER: process.env.MAPS_PROVIDER || 'structured-context',
+  AUTH_PROVIDER: process.env.AUTH_PROVIDER || 'local-beta',
+  DATABASE_PROVIDER: process.env.DATABASE_PROVIDER || 'local-storage',
+  OBJECT_STORAGE_PROVIDER: process.env.OBJECT_STORAGE_PROVIDER || 'local-storage',
+  OBSERVABILITY_PROVIDER: process.env.OBSERVABILITY_PROVIDER || 'fastify-logs',
+  HOSTING_PROVIDER: process.env.HOSTING_PROVIDER || 'local-smoke',
   RATE_LIMIT_MAX: process.env.RATE_LIMIT_MAX || '100',
   MAX_IMAGE_UPLOAD_MB: process.env.MAX_IMAGE_UPLOAD_MB || '8'
 };
@@ -81,7 +86,13 @@ function assertInventoryBound(payload, source) {
   if (payload.source !== source) fail(`Expected source ${source}, received ${payload.source}.`);
   if (!Array.isArray(payload.outfit) || payload.outfit.length === 0) fail(`${source} returned no outfit slots.`);
 
-  for (const slot of [...payload.outfit, ...(payload.fallbackAlternatives || [])]) {
+  const allSlots = [
+    ...payload.outfit,
+    ...(payload.fallbackAlternatives || []),
+    ...(payload.alternativeOutfits || []).flat()
+  ];
+
+  for (const slot of allSlots) {
     if (typeof slot.itemId !== 'string' || !slot.itemId.startsWith('item_')) {
       fail(`${source} returned a non-inventory item reference: ${JSON.stringify(slot)}.`);
     }
@@ -94,7 +105,7 @@ function assertInventoryBound(payload, source) {
     fail(`${source} did not return a text-to-speech summary.`);
   }
 
-  if (payload.providerMode !== 'mock') fail(`${source} should remain mock-only for this foundation.`);
+  if (payload.providerMode !== 'internal-ranker') fail(`${source} did not report the internal ranking engine.`);
   if (typeof payload.confidence !== 'number' || payload.confidence <= 0) fail(`${source} did not return confidence.`);
   if (!Array.isArray(payload.cautions)) fail(`${source} did not return cautions.`);
 }
@@ -134,11 +145,14 @@ try {
     recommendationId: voicePayload.recommendationId,
     userId: 'user_alpha',
     accepted: true,
-    reason: 'accepted'
+    reason: 'accepted',
+    itemIds: voicePayload.outfit.map((slot) => slot.itemId)
   });
-  if (feedbackPayload.ok !== true) fail('Feedback endpoint did not acknowledge the response.');
+  if (feedbackPayload.ok !== true || feedbackPayload.providerMode !== 'internal-ranker') {
+    fail('Feedback endpoint did not acknowledge the internal ranking response.');
+  }
 
-  console.log('API smoke test passed: closet, voice, autonomous, and feedback routes work.');
+  console.log('API smoke test passed: closet, voice, autonomous, alternatives, and feedback routes work.');
 } finally {
   server.kill();
 }
