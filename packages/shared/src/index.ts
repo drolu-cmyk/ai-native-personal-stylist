@@ -125,6 +125,13 @@ export interface DigitalCloset {
   updatedAt: ISODateTime;
 }
 
+export interface PreferenceSignals {
+  acceptedItemIds?: ClothingItemId[];
+  rejectedItemIds?: ClothingItemId[];
+  preferredTags?: string[];
+  avoidedTags?: string[];
+}
+
 export interface AmbientConditionTriggers {
   weather?: {
     condition: WeatherCondition;
@@ -154,6 +161,12 @@ export interface VoiceUtteranceContext {
   urgency: 'low' | 'normal' | 'high' | 'immediate';
   latencyBudgetMs: number;
   maxRecommendationCount?: number;
+  preferenceSignals?: PreferenceSignals;
+  /**
+   * Local-first beta support. Production deployments should replace this with
+   * an authenticated closet read from the configured database provider.
+   */
+  closetSnapshot?: DigitalCloset;
 }
 
 export interface RecommendedOutfitSlot {
@@ -183,12 +196,14 @@ export interface StyleRecommendationPayload {
   providerMode: ProviderMode;
   outfit: RecommendedOutfitSlot[];
   fallbackAlternatives: RecommendedOutfitSlot[];
+  alternativeOutfits?: RecommendedOutfitSlot[][];
   confidence: number;
   cautions: string[];
   orchestrationReason: string;
   ttsSummary: string;
   constraintsApplied: string[];
   rejectedItemIds: ClothingItemId[];
+  learningSummary?: string[];
 }
 
 export interface ApiErrorPayload {
@@ -207,7 +222,12 @@ export function ensureClosetItemIds(
   closet: DigitalCloset
 ): StyleRecommendationPayload {
   const validIds = new Set(closet.items.map((item) => item.id));
-  const allRecommendedIds = [...recommendation.outfit, ...recommendation.fallbackAlternatives].map((slot) => slot.itemId);
+  const alternativeIds = (recommendation.alternativeOutfits || []).flat().map((slot) => slot.itemId);
+  const allRecommendedIds = [
+    ...recommendation.outfit,
+    ...recommendation.fallbackAlternatives,
+    ...alternativeIds
+  ].map((slotOrId) => typeof slotOrId === 'string' ? slotOrId : slotOrId.itemId);
   const unknownIds = allRecommendedIds.filter((itemId) => !validIds.has(itemId));
 
   if (unknownIds.length > 0) {
