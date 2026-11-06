@@ -10,7 +10,7 @@ import {
   type UserProfile,
   type VoiceUtteranceContext
 } from '@stylist/shared';
-import { getActiveClosetItems, getDigitalCloset, getUserProfile } from '../data/mockCloset.js';
+import { getDigitalCloset, getUserProfile } from '../data/mockCloset.js';
 
 function nowIso() {
   return new Date().toISOString();
@@ -189,10 +189,9 @@ function buildRecommendation(
 
 export async function generateAutonomousRecommendation(userId: string): Promise<StyleRecommendationPayload> {
   const normalizedUserId = userId as UserId;
-  const [profile, closet, activeItems, weather, calendarEvent] = await Promise.all([
+  const [profile, closet, weather, calendarEvent] = await Promise.all([
     getUserProfile(normalizedUserId),
     getDigitalCloset(normalizedUserId),
-    getActiveClosetItems(normalizedUserId),
     fetchMockWeatherContext(),
     fetchMockCalendarContext()
   ]);
@@ -200,11 +199,6 @@ export async function generateAutonomousRecommendation(userId: string): Promise<
   if (!profile || !closet) {
     throw new Error(`No profile or closet found for ${userId}`);
   }
-
-  const activeCloset: DigitalCloset = {
-    ...closet,
-    items: activeItems
-  };
 
   const externalContext: AmbientConditionTriggers = {
     timeOfDay: 'evening',
@@ -220,7 +214,7 @@ export async function generateAutonomousRecommendation(userId: string): Promise<
   return assertAutonomousPayload(buildRecommendation({
     userId: normalizedUserId,
     profile,
-    closet: activeCloset,
+    closet,
     context: externalContext,
     source: 'autonomous-agent'
   }));

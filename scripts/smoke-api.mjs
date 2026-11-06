@@ -119,6 +119,15 @@ try {
   assertInventoryBound(voicePayload, 'voice-loop');
   assertInventoryBound(autonomousPayload, 'autonomous-agent');
 
+  const unavailableId = autonomousPayload.outfit[0].itemId;
+  await postJson('/api/closet/toggle-availability', { userId: 'user_alpha', itemId: unavailableId, available: false });
+  const afterToggle = await postJson('/api/autonomous-recommend', { userId: 'user_alpha' });
+  assertInventoryBound(afterToggle, 'autonomous-agent');
+  if (!afterToggle.rejectedItemIds?.includes(unavailableId)) fail('Unavailable item was not included in the audit trail.');
+  if ([...afterToggle.outfit, ...(afterToggle.fallbackAlternatives || [])].some((slot) => slot.itemId === unavailableId)) {
+    fail('Unavailable item was returned as an outfit or alternative.');
+  }
+
   console.log('API smoke test passed: voice and autonomous routes returned inventory-bound recommendations.');
 } finally {
   server.kill();

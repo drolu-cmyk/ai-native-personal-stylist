@@ -49,6 +49,8 @@ pnpm dev
 
 The default provider mode is `mock`, so contributors can run the system without paid services.
 
+The web build exposes the API URL to the browser. It uses `NEXT_PUBLIC_API_BASE_URL` when set, otherwise `API_BASE_URL`; set the former when browsers need a different address from the server. Rebuild the web app after changing it, and never include credentials in either URL.
+
 ## API examples
 
 ```bash

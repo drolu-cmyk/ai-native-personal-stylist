@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import type { ClothingItem, ClothingItemId, StyleRecommendationPayload } from '@stylist/shared';
+import { useMemo, useRef, useState } from 'react';
+import type { ClothingItem, StyleRecommendationPayload } from '@stylist/shared';
 import { ClosetItemCard } from './ClosetItemCard';
 import {
   alphaUserId,
@@ -17,34 +17,49 @@ interface ClosetDashboardProps {
 
 export function ClosetDashboard({ initialItems = initialClosetItems }: ClosetDashboardProps) {
   const [items, setItems] = useState<ClothingItem[]>(initialItems);
-  const [busyItemId, setBusyItemId] = useState<ClothingItemId | null>(null);
+  const [isBusy, setIsBusy] = useState(false);
+  const actionInFlight = useRef(false);
   const [recommendation, setRecommendation] = useState<StyleRecommendationPayload | null>(null);
   const [status, setStatus] = useState('Mock closet loaded locally.');
 
   const availableCount = useMemo(() => items.filter((item) => item.available).length, [items]);
 
   async function refreshCloset() {
+    if (actionInFlight.current) return;
+    actionInFlight.current = true;
+    setIsBusy(true);
     try {
       const closet = await fetchCloset(alphaUserId);
       setItems(closet.items);
       setStatus('Synced with API mock closet.');
     } catch {
       setStatus('API unavailable; showing local mock closet.');
+    } finally {
+      actionInFlight.current = false;
+      setIsBusy(false);
     }
   }
 
   async function requestRecommendation() {
+    if (actionInFlight.current) return;
+    actionInFlight.current = true;
+    setIsBusy(true);
     try {
       const payload = await requestAutonomousRecommendation(alphaUserId);
       setRecommendation(payload);
       setStatus('Autonomous recommendation generated from active closet items.');
     } catch {
       setStatus('Start the API on port 4000 to verify live recommendation fallback behavior.');
+    } finally {
+      actionInFlight.current = false;
+      setIsBusy(false);
     }
   }
 
   async function handleToggle(item: ClothingItem, available: boolean) {
-    setBusyItemId(item.id);
+    if (actionInFlight.current) return;
+    actionInFlight.current = true;
+    setIsBusy(true);
     setItems((currentItems) =>
       currentItems.map((currentItem) => (currentItem.id === item.id ? { ...currentItem, available } : currentItem))
     );
@@ -56,7 +71,8 @@ export function ClosetDashboard({ initialItems = initialClosetItems }: ClosetDas
     } catch {
       setStatus('API unavailable; local UI state updated for demo only.');
     } finally {
-      setBusyItemId(null);
+      actionInFlight.current = false;
+      setIsBusy(false);
     }
   }
 
@@ -77,8 +93,8 @@ export function ClosetDashboard({ initialItems = initialClosetItems }: ClosetDas
       </section>
 
       <section className="toolbar" aria-label="Closet actions">
-        <button onClick={refreshCloset} type="button">Sync closet</button>
-        <button onClick={requestRecommendation} type="button">Run proactive loop</button>
+        <button disabled={isBusy} onClick={refreshCloset} type="button">Sync closet</button>
+        <button disabled={isBusy} onClick={requestRecommendation} type="button">Run proactive loop</button>
         <span>{status}</span>
       </section>
 
@@ -97,7 +113,7 @@ export function ClosetDashboard({ initialItems = initialClosetItems }: ClosetDas
       <section className="closet-grid" aria-label="Wardrobe inventory">
         {items.map((item) => (
           <ClosetItemCard
-            isBusy={busyItemId === item.id}
+            isBusy={isBusy}
             item={item}
             key={item.id}
             onToggle={handleToggle}
