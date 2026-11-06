@@ -18,7 +18,8 @@
   },
   "pnpm": {
     "overrides": {
-      "postcss": "^8.5.15"
+      "postcss": "^8.5.23",
+      "light-my-request": "6.6.0"
     }
   },
   "devDependencies": {
